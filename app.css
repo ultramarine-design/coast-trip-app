@@ -338,3 +338,11 @@ main{padding:18px 16px calc(40px + var(--safe-b))}
   .btnrow .act.pri{color:#0b1418}
   .tl .ev{background:#173020;color:#7fcf83}
 }
+.hubs{display:flex;flex-wrap:wrap;gap:7px}
+.hub{display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;padding:9px 12px;border-radius:11px;
+  background:var(--paper-2);color:var(--ink);border:1px solid var(--line)}
+.hub svg{color:var(--clay)}
+.hub b{color:var(--moss);font-variant-numeric:tabular-nums}
+.rq{width:100%;font:inherit;font-size:15px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);
+  background:var(--surface);color:var(--ink);margin:0 0 12px}
+.card .pick{margin:6px 0 0;font-size:12px;font-weight:700;color:var(--clay)}

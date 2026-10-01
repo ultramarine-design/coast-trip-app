@@ -6,7 +6,7 @@ const view = $('#view');
 const backBtn = $('#backBtn');
 const sub = $('#sub');
 
-const state = { trip: null, region: '전체', stack: [] };
+const state = { trip: null, rest: null, region: '전체', stack: [] };
 const CHK_KEY = 'coast2026-check';
 
 const icon = {
@@ -15,6 +15,8 @@ const icon = {
   ext: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
   map: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>',
   check: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 12l3 3 5-6"/></svg>',
+  fork: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v6a3 3 0 0 0 6 0V3M9 12v9"/><path d="M17 3c-1.5 1-2 3-2 5s.5 3 2 4v9"/></svg>',
+  photo: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="11" r="2"/><path d="M3 17l5-4 4 3 3-2 6 4"/></svg>',
   book: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M4 19a2 2 0 0 1 2-2h12"/></svg>',
 };
 
@@ -37,6 +39,7 @@ async function boot() {
   try {
     // 단일 HTML 매뉴얼(build_single.py 산출물)은 데이터를 window.TRIP으로 품고 있다.
     state.trip = window.TRIP || await fetch('data/trip.json').then(r => r.json());
+    state.rest = window.REST || await fetch('data/restaurants.json').then(r => r.json());
   } catch {
     view.innerHTML = '<div class="empty"><div class="ico">⚠</div><p>데이터를 불러오지 못했어요.<br>인터넷 연결을 확인해 주세요.</p></div>';
     return;
@@ -160,15 +163,66 @@ function openDay(n, replace) {
        <div class="block"><h3>일정</h3><ul class="tl">${plan}</ul></div>
        ${sleepBlock}
        <div class="block"><h3>충전</h3><p>${esc(d.ev)}</p></div>
+       ${eatBlock(d)}
        ${d.warn && d.warn.length ? `<div class="block warnb"><h3>주의</h3><ul>${d.warn.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
        <div class="pager">
          <button id="prevD" ${n === 1 ? 'disabled' : ''}>‹ ${n > 1 ? n - 1 + '일차' : ''}</button>
          <button id="nextD" ${n === T.days.length ? 'disabled' : ''}>${n < T.days.length ? n + 1 + '일차' : ''} ›</button>
        </div>
      </div>`;
+  view.querySelectorAll('[data-hub]').forEach(b => b.addEventListener('click', () => openRest(b.dataset.hub)));
   $('#prevD').addEventListener('click', () => openDay(n - 1, true));
   $('#nextD').addEventListener('click', () => openDay(n + 1, true));
   window.scrollTo(0, 0);
+}
+
+// ── 식당 (지리산 앱의 안심식당 카드 방식) ──
+const PAGE = 60;
+const hubOf = id => state.rest.hubs.find(h => h.id === id);
+function eatBlock(d) {
+  const hubs = (d.eat || []).map(hubOf).filter(Boolean);
+  if (!hubs.length) return '';
+  return `<div class="block"><h3>식당 · 안심식당</h3>
+    <div class="hubs">${hubs.map(h => `<button class="hub" data-hub="${h.id}">${icon.fork}<span>${esc(h.label)}</span><b>${h.n}</b></button>`).join('')}</div></div>`;
+}
+// 네이버 검색은 상호 + 읍면/시 이름. 도로명까지 붙이면 빈 결과가 잦다.
+const naverQ = (nm, ad) => encodeURIComponent(nm + ' ' + ad.split(' ').slice(1, 3).join(' '));
+const rs = { hub: null, n: PAGE, q: '' };
+function openRest(hub) {
+  const h = hubOf(hub); if (!h) return;
+  state.stack.push({ v: 'rest', hub }); hpush();
+  backBtn.hidden = false;
+  sub.textContent = h.label + ' 식당';
+  rs.hub = hub; rs.n = PAGE; rs.q = '';
+  view.innerHTML = `<div class="rhead"><h2>${esc(h.label)}</h2>
+      <p>농식품부 안심식당 ${h.n}곳.${h.pick ? ` 상호에 ${esc(h.kw.join('·'))} 들어간 ${h.pick}곳을 위에 올렸어요.` : ''} 사진과 영업 정보는 네이버로 확인해요.</p></div>
+    ${h.n > 20 ? '<input class="rq" id="rq" type="search" placeholder="상호, 업종, 도로명으로 찾기">' : ''}
+    <div id="rlist"></div>`;
+  const q = $('#rq');
+  if (q) q.addEventListener('input', () => { rs.q = q.value.trim(); rs.n = PAGE; renderRest(); });
+  renderRest();
+  window.scrollTo(0, 0);
+}
+function renderRest() {
+  let all = state.rest.items.filter(r => r[4] === rs.hub);
+  if (rs.q) all = all.filter(r => (r[0] + ' ' + r[1] + ' ' + r[2]).includes(rs.q));
+  const card = ([nm, gb, ad, tel, , pick]) => {
+    const dl = tel && !tel.includes('*') ? dial(tel) : '';
+    return `<article class="card"><div class="row1"><h3 class="name">${esc(nm)}</h3><span class="tag">${esc(gb || '음식점')}</span></div>
+      ${pick ? `<p class="pick">일정 메뉴 · ${esc(pick)}</p>` : ''}
+      <p class="addr"><span>${esc(ad)}</span></p>
+      <div class="foot">
+        ${dl.length >= 8 ? `<a class="act tel" href="tel:${dl}">${icon.phone}전화</a>` : ''}
+        <a class="act photo" href="https://search.naver.com/search.naver?where=image&query=${naverQ(nm, ad)}" target="_blank" rel="noopener">${icon.photo}사진</a>
+        <a class="act naver" href="https://search.naver.com/search.naver?query=${naverQ(nm, ad)}" target="_blank" rel="noopener">${icon.ext}네이버</a>
+      </div></article>`;
+  };
+  let html = all.length ? `<div class="list">${all.slice(0, rs.n).map(card).join('')}</div>`
+    : '<div class="empty"><p>찾는 식당이 없어요.</p></div>';
+  if (rs.n < all.length) html += `<button class="more" id="more">${all.length - rs.n}곳 더 보기</button>`;
+  html += `<p class="foot-note">자료 ${esc(state.rest.source)} · 기준일 ${esc(state.rest.updated)}<br>휴대폰 번호는 공공데이터에서 가려져 있어 전화 버튼이 없어요. 폐업했을 수 있으니 가기 전에 네이버로 확인하세요.</p>`;
+  $('#rlist').innerHTML = html;
+  const m = $('#more'); if (m) m.addEventListener('click', () => { rs.n += PAGE; renderRest(); });
 }
 
 // ── 체크리스트 ──
@@ -229,6 +283,7 @@ function back1() {
   state.stack.pop();
   if (prev === 'check') return openCheck();
   if (prev === 'appendix') return openAppendix();
+  if (prev.v === 'rest') return openRest(prev.hub);
   if (prev.v === 'day') return openDay(prev.d);
   renderHome();
 }

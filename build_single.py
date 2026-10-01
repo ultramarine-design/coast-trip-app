@@ -11,7 +11,7 @@ assert not os.path.exists(out), f'이미 있음: {out} (덮어쓰지 않는다, 
 html = rd('index.html')
 html = html.replace('<link rel="stylesheet" href="app.css">', '<style>\n' + rd('app.css') + '\n</style>')
 html = html.replace('<script src="app.js" defer></script>',
-    '<script>window.TRIP = ' + rd('data/trip.json') + ';</script>\n<script>\n' + rd('app.js') + '\n</script>')
+    '<script>window.TRIP = ' + rd('data/trip.json') + ';\nwindow.REST = ' + rd('data/restaurants.json') + ';</script>\n<script>\n' + rd('app.js') + '\n</script>')
 for tag in ('<link rel="manifest" href="manifest.webmanifest">\n', '<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">\n'):
     html = html.replace(tag, '')
 open(out, 'w', encoding='utf-8').write(html)
