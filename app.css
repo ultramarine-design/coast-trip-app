@@ -346,3 +346,15 @@ main{padding:18px 16px calc(40px + var(--safe-b))}
 .rq{width:100%;font:inherit;font-size:15px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);
   background:var(--surface);color:var(--ink);margin:0 0 12px}
 .card .pick{margin:6px 0 0;font-size:12px;font-weight:700;color:var(--clay)}
+.dhead .brief{margin:8px 0 0;font-size:13.5px;font-weight:600;color:var(--clay);line-height:1.5}
+.memo{width:100%;margin-top:10px;font:inherit;font-size:14px;padding:10px 12px;border-radius:11px;border:1px dashed var(--line);
+  background:var(--paper);color:var(--ink);resize:vertical}
+.ct.sos a{background:var(--clay);color:#fff}
+@media (prefers-color-scheme:dark){.ct.sos a{color:#0b1418}}
+.pk{padding:12px 0;border-top:1px solid var(--line)}
+.pk:first-of-type{border-top:none;padding-top:0}
+.pk .ml{display:inline-block;font-size:11.5px;font-weight:700;color:var(--clay);margin-right:6px}
+.pk b{font-size:15.5px}
+.pk p{margin:5px 0 0;font-size:13.5px;line-height:1.55;color:var(--ink-soft)}
+.pk p small{color:var(--muted);font-size:12px}
+.pk .nt{font-size:12.5px;color:var(--muted)}

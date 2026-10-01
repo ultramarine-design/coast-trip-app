@@ -28,6 +28,9 @@ const rcolor = nm => (state.trip.regions.find(r => r.nm === nm) || {}).c || 'var
 // 체크 상태는 기기에만 저장한다. 사파리 개인정보 모드 등에서 막히면 저장 없이 동작.
 function loadChk() { try { return JSON.parse(localStorage.getItem(CHK_KEY)) || {}; } catch { return {}; } }
 function saveChk(o) { try { localStorage.setItem(CHK_KEY, JSON.stringify(o)); } catch {} }
+const MEMO_KEY = 'coast2026-memo';
+function loadMemo() { try { return JSON.parse(localStorage.getItem(MEMO_KEY)) || {}; } catch { return {}; } }
+function saveMemo(o) { try { localStorage.setItem(MEMO_KEY, JSON.stringify(o)); } catch {} }
 
 // 오늘 날짜(기기 시간)를 YYYY-MM-DD로
 function todayStr() {
@@ -62,7 +65,7 @@ function renderHome() {
   const td = T.days.find(d => d.date === today);
   if (td) {
     banner = `<button class="today" data-d="${td.d}"><span class="tx"><span class="tt">오늘 ${td.d}일차 · ${esc(td.title)}</span>
-      <span class="sx">${esc(td.via)} · 잘 곳 ${esc(td.sleep.name)}</span></span><span class="arw">›</span></button>`;
+      <span class="sx">${esc(td.brief || td.via)}</span></span><span class="arw">›</span></button>`;
   } else if (today < first) {
     const left = Math.round((new Date(first) - new Date(today)) / 86400000);
     const chk = loadChk();
@@ -147,6 +150,7 @@ function openDay(n, replace) {
       <p><b>${esc(s.name)}</b>${s.fee ? ' · ' + esc(s.fee) : ''}</p>
       <p style="margin-top:6px">${esc(s.info)}</p>
       ${s.alt ? `<p class="alt">대안: ${esc(s.alt)}</p>` : ''}
+      <textarea class="memo" data-memo="${d.d}" rows="2" placeholder="예약번호, 입실 시간 메모 (이 기기에만 저장)">${esc(loadMemo()[d.d] || '')}</textarea>
       <div class="btnrow">
         ${s.tel ? `<a class="act" href="tel:${dial(s.tel)}">${icon.phone}전화</a>` : ''}
         ${s.url ? `<a class="act" href="${esc(s.url)}" target="_blank" rel="noopener">${icon.ext}예약</a>` : ''}
@@ -155,25 +159,45 @@ function openDay(n, replace) {
 
   view.innerHTML =
     `<div class="detail">
-       <div class="dhead"><span class="rgn" style="--c:${rcolor(d.region)}">${esc(d.region)} · ${d.d}일차</span><h2>${esc(d.title)}</h2></div>
+       <div class="dhead"><span class="rgn" style="--c:${rcolor(d.region)}">${esc(d.region)} · ${d.d}일차</span><h2>${esc(d.title)}</h2>${d.brief ? `<p class="brief">${esc(d.brief)}</p>` : ''}</div>
        <div class="statgrid">
          ${stat('거리', d.km + 'km', true)}${stat('주행', d.drive)}
          ${stat('잘 곳', d.home ? '집' : s.type)}${stat('해', d.sun)}
        </div>
        <div class="block"><h3>일정</h3><ul class="tl">${plan}</ul></div>
        ${sleepBlock}
-       <div class="block"><h3>충전</h3><p>${esc(d.ev)}</p></div>
+       <div class="block"><h3>충전</h3><p>${esc(d.ev)}</p>${d.evq ? `<div class="btnrow"><a class="act" href="${mapUrl(d.evq)}" target="_blank" rel="noopener">${icon.map}근처 급속 충전소 지도</a></div>` : ''}</div>
+       ${picksBlock(d)}
        ${eatBlock(d)}
        ${d.warn && d.warn.length ? `<div class="block warnb"><h3>주의</h3><ul>${d.warn.map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>` : ''}
+       ${d.rain ? `<div class="block"><h3>비 오거나 바람 불면</h3><p>${esc(d.rain)}</p></div>` : ''}
        <div class="pager">
          <button id="prevD" ${n === 1 ? 'disabled' : ''}>‹ ${n > 1 ? n - 1 + '일차' : ''}</button>
          <button id="nextD" ${n === T.days.length ? 'disabled' : ''}>${n < T.days.length ? n + 1 + '일차' : ''} ›</button>
        </div>
      </div>`;
+  const mm = view.querySelector('[data-memo]');
+  if (mm) mm.addEventListener('input', () => { const o = loadMemo(); o[mm.dataset.memo] = mm.value; saveMemo(o); });
   view.querySelectorAll('[data-hub]').forEach(b => b.addEventListener('click', () => openRest(b.dataset.hub)));
   $('#prevD').addEventListener('click', () => openDay(n - 1, true));
   $('#nextD').addEventListener('click', () => openDay(n + 1, true));
   window.scrollTo(0, 0);
+}
+
+// 끼니별 추천(서브에이전트 조사, 다이닝코드 출처). 안심식당 목록 위에 둔다.
+function picksBlock(d) {
+  if (!d.picks || !d.picks.length) return '';
+  return `<div class="block"><h3>끼니별 추천</h3>${d.picks.map(p => `<div class="pk">
+      <span class="ml">${esc(p.meal)}</span><b>${esc(p.nm)}</b>
+      <p>${esc(p.menu)}<br><small>${esc(p.ad)} · ${esc(p.hours)}</small></p>
+      ${p.note ? `<p class="nt">${esc(p.note)}</p>` : ''}
+      ${p.alt ? `<p class="nt">대안: ${esc(p.alt)}</p>` : ''}
+      <div class="btnrow">
+        <a class="act" href="${mapUrl(p.q)}" target="_blank" rel="noopener">${icon.map}지도</a>
+        <a class="act" href="https://search.naver.com/search.naver?query=${encodeURIComponent(p.q)}" target="_blank" rel="noopener">${icon.ext}네이버</a>
+        <a class="act" href="https://www.diningcode.com/profile.php?rid=${encodeURIComponent(p.rid)}" target="_blank" rel="noopener">출처</a>
+      </div></div>`).join('')}
+    <p class="alt">영업시간은 플랫폼 정보예요. 공휴일 영업은 확인하지 못했으니 가기 전에 네이버로 보세요.</p></div>`;
 }
 
 // ── 식당 (지리산 앱의 안심식당 카드 방식) ──
@@ -182,7 +206,7 @@ const hubOf = id => state.rest.hubs.find(h => h.id === id);
 function eatBlock(d) {
   const hubs = (d.eat || []).map(hubOf).filter(Boolean);
   if (!hubs.length) return '';
-  return `<div class="block"><h3>식당 · 안심식당</h3>
+  return `<div class="block"><h3>그 밖의 식당 · 안심식당</h3>
     <div class="hubs">${hubs.map(h => `<button class="hub" data-hub="${h.id}">${icon.fork}<span>${esc(h.label)}</span><b>${h.n}</b></button>`).join('')}</div></div>`;
 }
 // 네이버 검색은 상호 + 읍면/시 이름. 도로명까지 붙이면 빈 결과가 잦다.
@@ -258,7 +282,7 @@ function openAppendix() {
   const T = state.trip;
   const secs = T.appendix.map(a => `<div class="sec"><h3>${esc(a.title)}</h3>${a.paras.map(p => `<p>${esc(p)}</p>`).join('')}</div>`).join('');
   const contacts = `<div class="sec"><h3>연락처</h3>${T.contacts.map(c =>
-    `<div class="ct"><span class="nm">${esc(c.nm)}${c.note ? `<small>${esc(c.note)}</small>` : ''}</span><a href="tel:${dial(c.tel)}">${esc(c.tel)}</a></div>`).join('')}</div>`;
+    `<div class="ct${c.tel.length <= 3 ? ' sos' : ''}"><span class="nm">${esc(c.nm)}${c.note ? `<small>${esc(c.note)}</small>` : ''}</span><a href="tel:${dial(c.tel)}">${esc(c.tel)}</a></div>`).join('')}</div>`;
   const sources = `<div class="sec"><h3>출처와 확인 범위</h3>${T.sources.map(s =>
     `<div class="src"><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.x)}</a><span class="lv">${esc(s.lv)}</span></div>`).join('')}
     <p style="margin-top:10px">${esc(T.unverified)}</p></div>`;
