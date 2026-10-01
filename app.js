@@ -35,13 +35,14 @@ function todayStr() {
 
 async function boot() {
   try {
-    state.trip = await fetch('data/trip.json').then(r => r.json());
+    // 단일 HTML 매뉴얼(build_single.py 산출물)은 데이터를 window.TRIP으로 품고 있다.
+    state.trip = window.TRIP || await fetch('data/trip.json').then(r => r.json());
   } catch {
     view.innerHTML = '<div class="empty"><div class="ico">⚠</div><p>데이터를 불러오지 못했어요.<br>인터넷 연결을 확인해 주세요.</p></div>';
     return;
   }
   renderHome();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (!window.TRIP && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
 // ── 홈 ──
@@ -128,7 +129,7 @@ function renderList() {
 function openDay(n, replace) {
   const T = state.trip;
   const d = T.days.find(x => x.d === n); if (!d) return;
-  if (replace) state.stack.pop();
+  if (replace) state.stack.pop(); else hpush();
   state.stack.push({ v: 'day', d: n });
   backBtn.hidden = false;
   sub.textContent = `${d.d}일차 · ${d.label}${d.holiday ? ' ' + d.holiday : ''}`;
@@ -172,7 +173,7 @@ function openDay(n, replace) {
 
 // ── 체크리스트 ──
 function openCheck() {
-  state.stack.push('check');
+  state.stack.push('check'); hpush();
   backBtn.hidden = false;
   sub.textContent = '체크리스트';
   const T = state.trip, chk = loadChk();
@@ -197,7 +198,7 @@ function onChk(e) {
 
 // ── 부록 ──
 function openAppendix() {
-  state.stack.push('appendix');
+  state.stack.push('appendix'); hpush();
   backBtn.hidden = false;
   sub.textContent = '부록';
   const T = state.trip;
@@ -213,7 +214,14 @@ function openAppendix() {
 }
 
 // ── 뒤로가기 ──
+// 뒤로 가서 이전 뷰를 다시 그릴 때는 히스토리를 쌓지 않는다.
+let restoring = false;
+function hpush() { if (!restoring) history.pushState(null, ''); }
 function goBack() {
+  restoring = true;
+  try { back1(); } finally { restoring = false; }
+}
+function back1() {
   view.removeEventListener('change', onChk);
   state.stack.pop();
   const prev = state.stack[state.stack.length - 1];
@@ -225,5 +233,7 @@ function goBack() {
   renderHome();
 }
 
-backBtn.addEventListener('click', goBack);
+// 앱 ← 버튼과 폰의 뒤로가기(스와이프, 하드웨어 버튼)를 같은 경로로 처리한다.
+backBtn.addEventListener('click', () => history.back());
+window.addEventListener('popstate', () => { if (state.stack.length > 1) goBack(); });
 boot();

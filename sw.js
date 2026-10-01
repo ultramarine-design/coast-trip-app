@@ -2,7 +2,8 @@
 // 네트워크 우선: 온라인이면 최신, 오프라인이면 캐시. 데이터·셸을 고치면 아래 버전을 올린다.
 const SHELL = 'coast-shell-v1';
 const FILES = [
-  './', './index.html', './app.css', './app.js', './manifest.webmanifest', './data/trip.json'
+  './', './index.html', './app.css', './app.js', './manifest.webmanifest', './data/trip.json',
+  './icons/icon-192.png', './icons/apple-touch-icon.png'
 ];
 
 self.addEventListener('install', e => {
