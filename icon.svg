@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- 앱 아이콘 원본. 하늘, 노을 해, 파도, 해안을 따라 도는 점선 경로 -->
+  <rect width="512" height="512" fill="#0b5a73"/>
+  <rect x="72" y="88" width="368" height="250" rx="60" fill="#dcecf1"/>
+  <circle cx="256" cy="268" r="74" fill="#e8834f"/>
+  <path d="M72 300 Q136 268 200 300 T328 300 T440 300 V338 H72Z" fill="#137391"/>
+  <path d="M72 338 Q136 306 200 338 T328 338 T440 338 V420 H72Z" fill="#08465a"/>
+  <path d="M110 392 C170 360 220 410 280 380 S380 360 410 386" fill="none" stroke="#fbebe2" stroke-width="13" stroke-linecap="round" stroke-dasharray="1 26"/>
+</svg>
