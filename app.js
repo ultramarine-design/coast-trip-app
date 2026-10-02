@@ -23,7 +23,7 @@ const icon = {
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const mapUrl = q => 'https://map.naver.com/p/search/' + encodeURIComponent(q);
 const dial = t => t.replace(/[^0-9]/g, '');
-const rcolor = nm => (state.trip.regions.find(r => r.nm === nm) || {}).c || 'var(--moss)';
+const rcolor = nm => (state.trip.regions.find(r => r.nm === nm) || {}).c || 'var(--sea)';
 
 // 체크 상태는 기기에만 저장한다. 사파리 개인정보 모드 등에서 막히면 저장 없이 동작.
 function loadChk() { try { return JSON.parse(localStorage.getItem(CHK_KEY)) || {}; } catch { return {}; } }
@@ -55,6 +55,7 @@ async function boot() {
 function renderHome() {
   state.stack = ['home'];
   backBtn.hidden = true;
+  setTab('home');
   sub.textContent = '7박 8일 일자별 가이드';
   const T = state.trip;
   const today = todayStr();
@@ -79,15 +80,19 @@ function renderHome() {
   const chips = [chip('전체', T.days.length)].concat(counts.map(([nm, n]) => chip(nm, n, rcolor(nm)))).join('');
 
   view.innerHTML =
-    `<section class="lede fade">
-       <span class="kicker">${esc(T.period)}</span>
-       <h2>해안선 <em>${T.totalKm.toLocaleString('ko-KR')}km</em>를<br>하루씩 펼쳐 봐요</h2>
-       <p>${esc(T.summary)}</p>
+    `<section class="hero">
+       ${routeSvg(null)}
+       <div class="hero-tx">
+         <h2>${T.totalKm.toLocaleString('ko-KR')}<small>km</small></h2>
+         <p>${esc(T.periodShort || T.period)}</p>
+       </div>
      </section>
+     <p class="hero-sum">${esc(T.summary)}</p>
      ${banner}
      <div class="controls"><div class="chips" id="rChips">${chips}</div></div>
      <div id="results"></div>`;
 
+  view.querySelectorAll('.hero [data-d]').forEach(g => g.addEventListener('click', () => openDay(+g.dataset.d)));
   const tb = view.querySelector('.today[data-d]');
   if (tb) tb.addEventListener('click', () => openDay(+tb.dataset.d));
   const pb = $('#preBtn');
@@ -106,29 +111,21 @@ function renderHome() {
 function renderList() {
   const T = state.trip, today = todayStr();
   const days = state.region === '전체' ? T.days : T.days.filter(d => d.region === state.region);
+  const maxKm = Math.max(...T.days.map(x => x.km));
   const cards = days.map(d => {
-    const hol = d.holiday ? `<span class="b hol">${esc(d.holiday)}</span>` : '';
-    const heavy = d.heavy ? '<span class="b heavy">가장 먼 날</span>' : '';
-    const sl = d.home ? '<span class="b">귀가</span>' : `<span class="b">${esc(d.sleep.type)}</span>`;
-    return `<button class="seg${d.date === today ? ' is-today' : ''}" data-d="${d.d}" style="--c:${rcolor(d.region)}">
-        <div class="head"><span class="no">${esc(d.label)}</span><span class="nm">${esc(d.title)}</span><span class="arw">›</span></div>
-        <div class="badges"><span class="b km">${d.km}km · ${esc(d.drive)}</span>${sl}${hol}${heavy}</div>
-        <p class="route">${icon.route}<span>${esc(d.via)}${d.home ? '' : ' · 잘 곳 ' + esc(d.sleep.name)}</span></p>
+    const hol = d.holiday ? `<em>${esc(d.holiday)}</em>` : '';
+    const sl = d.home ? '집으로' : `${esc(d.sleep.type)}, ${esc(d.sleep.name)}`;
+    return `<button class="day${d.date === today ? ' is-today' : ''}" data-d="${d.d}" style="--c:${rcolor(d.region)}">
+        <span class="dn">${d.d}</span>
+        <span class="dm"><span class="dl">${esc(d.label)}${hol}</span><span class="dt">${esc(d.title)}</span><span class="ds">${sl}</span></span>
+        <span class="dk"><b>${d.km}</b>km<i style="--w:${Math.round(d.km / maxKm * 100)}%"></i>${d.heavy ? '<span class="hv">가장 먼 날</span>' : ''}</span>
       </button>`;
   }).join('');
 
-  const tail = state.region === '전체'
-    ? `<button class="tile" id="chkBtn"><span class="ic">${icon.check}</span>
-         <span class="tx"><span class="tt">체크리스트</span><span class="sx">예약, 전화 확인, 준비물</span></span><span class="arw">›</span></button>
-       <button class="tile" id="appxBtn"><span class="ic">${icon.book}</span>
-         <span class="tx"><span class="tt">부록</span><span class="sx">충전, 차박, 날씨, 연락처, 출처</span></span><span class="arw">›</span></button>
-       <p class="foot-note">${T.notes.map(esc).join('<br>')}</p>`
-    : '';
+  const tail = state.region === '전체' ? `<p class="foot-note">${T.notes.map(esc).join('<br>')}</p>` : '';
 
-  $('#results').innerHTML = `<div class="list stagger">${cards}</div>${tail}`;
-  $('#results').querySelectorAll('.seg').forEach(b => b.addEventListener('click', () => openDay(+b.dataset.d)));
-  const cb = $('#chkBtn'); if (cb) cb.addEventListener('click', openCheck);
-  const ab = $('#appxBtn'); if (ab) ab.addEventListener('click', openAppendix);
+  $('#results').innerHTML = `<div class="log">${cards}</div>${tail}`;
+  $('#results').querySelectorAll('.day').forEach(b => b.addEventListener('click', () => openDay(+b.dataset.d)));
 }
 
 // ── 일자 상세 ──
@@ -136,17 +133,17 @@ function openDay(n, replace) {
   const T = state.trip;
   const d = T.days.find(x => x.d === n); if (!d) return;
   if (replace) state.stack.pop(); else hpush();
-  state.stack.push({ v: 'day', d: n });
+  state.stack.push({ v: 'day', d: n }); setTab('home');
   backBtn.hidden = false;
   sub.textContent = `${d.d}일차 · ${d.label}${d.holiday ? ' ' + d.holiday : ''}`;
 
-  const stat = (k, v, accent) => `<div class="stat${accent ? ' accent' : ''}"><div class="k">${k}</div><div class="v">${esc(v)}</div></div>`;
+  const stat = (k, v) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`;
   const plan = d.plan.map(p => `<li><span class="t">${esc(p.t)}</span>
       <span class="x">${esc(p.x)}${p.ev ? '<span class="ev">충전</span>' : ''}</span>
       ${p.q ? `<a class="go" href="${mapUrl(p.q)}" target="_blank" rel="noopener" aria-label="${esc(p.q)} 지도">${icon.map}</a>` : ''}</li>`).join('');
 
   const s = d.sleep;
-  const sleepBlock = d.home ? '' : `<div class="block"><h3>잘 곳 · ${esc(s.type)}</h3>
+  const sleepBlock = d.home ? '' : `<div class="block stay"><h3>잘 곳 · ${esc(s.type)}</h3>
       <p><b>${esc(s.name)}</b>${s.fee ? ' · ' + esc(s.fee) : ''}</p>
       <p style="margin-top:6px">${esc(s.info)}</p>
       ${s.alt ? `<p class="alt">대안: ${esc(s.alt)}</p>` : ''}
@@ -159,12 +156,14 @@ function openDay(n, replace) {
 
   view.innerHTML =
     `<div class="detail">
-       <div class="dhead"><span class="rgn" style="--c:${rcolor(d.region)}">${esc(d.region)} · ${d.d}일차</span><h2>${esc(d.title)}</h2>${d.brief ? `<p class="brief">${esc(d.brief)}</p>` : ''}</div>
-       <div class="statgrid">
-         ${stat('거리', d.km + 'km', true)}${stat('주행', d.drive)}
-         ${stat('잘 곳', d.home ? '집' : s.type)}${stat('해', d.sun)}
-       </div>
-       <div class="block"><h3>일정</h3><ul class="tl">${plan}</ul></div>
+       <header class="dhero" style="--c:${rcolor(d.region)}">
+         <div class="dh-tx"><p class="rgn">${d.d}일차, ${esc(d.region)}</p><h2>${esc(d.title)}</h2>${d.brief ? `<p class="brief">${esc(d.brief)}</p>` : ''}</div>
+         ${routeSvg(d.d)}
+       </header>
+       <dl class="facts">
+         ${stat('거리', d.km + 'km')}${stat('주행', d.drive)}${stat('잘 곳', d.home ? '집' : s.type)}${d.sun && d.sun !== '—' ? stat('해', d.sun) : ''}
+       </dl>
+       <div class="block"><h3>시간표</h3><ul class="tl">${plan}</ul></div>
        ${sleepBlock}
        <div class="block"><h3>충전</h3><p>${esc(d.ev)}</p>${d.evq ? `<div class="btnrow"><a class="act" href="${mapUrl(d.evq)}" target="_blank" rel="noopener">${icon.map}근처 급속 충전소 지도</a></div>` : ''}</div>
        ${picksBlock(d)}
@@ -251,7 +250,7 @@ function renderRest() {
 
 // ── 체크리스트 ──
 function openCheck() {
-  state.stack.push('check'); hpush();
+  state.stack.push('check'); hpush(); setTab('check');
   backBtn.hidden = false;
   sub.textContent = '체크리스트';
   const T = state.trip, chk = loadChk();
@@ -276,7 +275,7 @@ function onChk(e) {
 
 // ── 부록 ──
 function openAppendix() {
-  state.stack.push('appendix'); hpush();
+  state.stack.push('appendix'); hpush(); setTab('appx');
   backBtn.hidden = false;
   sub.textContent = '부록';
   const T = state.trip;
@@ -313,6 +312,42 @@ function back1() {
 }
 
 // 앱 ← 버튼과 폰의 뒤로가기(스와이프, 하드웨어 버튼)를 같은 경로로 처리한다.
+// ── 항로 그림: 날짜별 실제 경유 좌표를 이은 선. hl이 있으면 그날만 밝게 ──
+const PROJ = ([lat, lon]) => [((lon - 126.15) * 82).toFixed(1), ((38.05 - lat) * 100).toFixed(1)];
+function routeSvg(hl) {
+  const T = state.trip;
+  const grid = [35, 36, 37].map(la => `<line x1="0" x2="300" y1="${PROJ([la, 126])[1]}" y2="${PROJ([la, 126])[1]}"/><text x="2" y="${PROJ([la, 126])[1] - 3}">${la}°N</text>`).join('')
+    + [127, 128, 129].map(lo => `<line y1="0" y2="390" x1="${PROJ([36, lo])[0]}" x2="${PROJ([36, lo])[0]}"/><text x="${+PROJ([36, lo])[0] + 3}" y="386">${lo}°E</text>`).join('');
+  const legs = T.days.map(d => {
+    const pts = d.pts.map(PROJ).map(p => p.join(',')).join(' ');
+    const dim = hl && hl !== d.d ? ' dim' : '';
+    return `<polyline class="leg${dim}" points="${pts}" pathLength="1" style="--c:${rcolor(d.region)};--i:${d.d}"/>`;
+  }).join('');
+  const stops = T.days.map(d => {
+    const [x, y] = PROJ(d.pts[d.pts.length - 1]);
+    const on = hl === d.d ? ' on' : (hl ? ' dim' : '');
+    return `<g class="stop${on}" data-d="${d.d}" transform="translate(${x} ${y})" style="--c:${rcolor(d.region)}" role="button" aria-label="${d.d}일차 ${esc(d.stop)}">
+      <circle r="${hl === d.d ? 11 : 9}"/><text dy="3.6">${d.d}</text></g>`;
+  }).join('');
+  const [sx, sy] = PROJ(T.days[0].pts[0]);
+  return `<svg class="route${hl ? ' mini' : ''}" viewBox="0 0 300 392" aria-hidden="${hl ? 'true' : 'false'}" role="img" aria-label="해안 일주 항로">
+    <g class="grid">${grid}</g>${legs}
+    <g class="start" transform="translate(${sx} ${sy})"><rect x="-4" y="-4" width="8" height="8"/><text x="8" y="4">거제</text></g>
+    ${stops}</svg>`;
+}
+
+// ── 하단 탭 ──
+function setTab(t) {
+  document.querySelectorAll('.tabbar [data-tab]').forEach(b => b.dataset.tab === t ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
+}
+document.querySelector('.tabbar').addEventListener('click', e => {
+  const b = e.target.closest('[data-tab]'); if (!b) return;
+  view.removeEventListener('change', onChk);
+  if (b.dataset.tab === 'home') return renderHome();
+  state.stack = ['home'];
+  b.dataset.tab === 'check' ? openCheck() : openAppendix();
+});
+
 backBtn.addEventListener('click', () => history.back());
 window.addEventListener('popstate', () => { if (state.stack.length > 1) goBack(); });
 boot();
