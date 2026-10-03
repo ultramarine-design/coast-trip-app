@@ -1,6 +1,6 @@
 // 전국 해안 일주 서비스워커 (지리산 둘레길 앱과 같은 방식)
 // 네트워크 우선: 온라인이면 최신, 오프라인이면 캐시. 데이터·셸을 고치면 아래 버전을 올린다.
-const SHELL = 'coast-shell-v21';
+const SHELL = 'coast-shell-v22';
 const FILES = [
   './', './index.html', './app.css', './app.js', './manifest.webmanifest', './data/trip.json', './data/restaurants.json',
   './icons/icon-192.png', './icons/apple-touch-icon.png'
