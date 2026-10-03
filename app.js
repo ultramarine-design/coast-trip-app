@@ -194,7 +194,7 @@ function picksBlock(d) {
       <div class="btnrow">
         <a class="act" href="${mapUrl(p.q)}" target="_blank" rel="noopener">${icon.map}지도</a>
         <a class="act" href="https://search.naver.com/search.naver?query=${encodeURIComponent(p.q)}" target="_blank" rel="noopener">${icon.ext}네이버</a>
-        <a class="act" href="https://www.diningcode.com/profile.php?rid=${encodeURIComponent(p.rid)}" target="_blank" rel="noopener">출처</a>
+        ${p.rid ? `<a class="act" href="https://www.diningcode.com/profile.php?rid=${encodeURIComponent(p.rid)}" target="_blank" rel="noopener">출처</a>` : ''}
       </div></div>`).join('')}
     <p class="alt">영업시간은 플랫폼 정보예요. 공휴일 영업은 확인하지 못했으니 가기 전에 네이버로 보세요.</p></div>`;
 }
